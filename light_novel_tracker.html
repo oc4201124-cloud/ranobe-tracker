@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ラノベ管理</title>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --bg: #ffffff;
+    --bg-soft: #f6f7f9;
+    --border: #e2e5ea;
+    --text: #1c1f24;
+    --muted: #6b7280;
+    --accent: #3b82f6;
+    --accent-dark: #2563eb;
+    --danger: #ef4444;
+    --success: #10b981;
+    --warn: #d97706;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .title-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px;
+    max-width: 960px; margin: 0 auto;
+  }
+  .title-bar h1 {
+    margin: 0; font-size: 18px; font-weight: 700;
+  }
+  .title-bar .sub {
+    font-size: 12px; color: var(--muted);
+  }
+  .tabs {
+    display: flex;
+    max-width: 960px; margin: 0 auto;
+    overflow-x: auto;
+  }
+  .tabs button {
+    flex: 1; min-width: 84px;
+    background: none; border: none;
+    padding: 12px 8px;
+    font-size: 14px; color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .tabs button.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+  }
+  main {
+    max-width: 960px; margin: 0 auto;
+    padding: 16px;
+  }
+  section.tab-panel { display: none; }
+  section.tab-panel.active { display: block; }
+
+  h2 { font-size: 16px; margin: 0 0 12px; }
+
+  input[type="text"], input[type="password"], select, textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    background: var(--bg);
+    font-family: inherit;
+    color: var(--text);
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none; border-color: var(--accent);
+  }
+  label {
+    display: block;
+    font-size: 13px; color: var(--muted);
+    margin: 12px 0 4px;
+  }
+  button.btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 4px;
+    padding: 9px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    text-decoration: none;
+  }
+  button.btn:hover, a.btn:hover { background: var(--bg-soft); }
+  button.btn.primary, a.btn.primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  button.btn.primary:hover, a.btn.primary:hover { background: var(--accent-dark); }
+  button.btn.small, a.btn.small { padding: 5px 10px; font-size: 12px; }
+  button.btn.danger { color: var(--danger); border-color: #fecaca; }
+  button.btn.danger:hover { background: #fef2f2; }
+
+  .toolbar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .toolbar input { flex: 1; min-width: 160px; }
+  .toolbar select { flex: 0 0 auto; width: auto; }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 14px;
+  }
+  .book-card {
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
+    box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: 8px;
+    position: relative;
+  }
+  .book-card.done {
+    background: #f3f4f6;
+    color: #9ca3af;
+  }
+  .book-card.done .book-title { color: #6b7280; }
+  .book-card.done .btn { opacity: 0.8; }
+  .book-title {
+    font-size: 15px; font-weight: 700;
+    word-break: break-word;
+    margin: 0;
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .book-meta { font-size: 13px; color: var(--muted); }
+  .book-meta .vol {
+    display: inline-block;
+    background: #dbeafe;
+    color: var(--accent-dark);
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-weight: 600;
+    margin-right: 6px;
+  }
+  .book-card.done .book-meta .vol {
+    background: #e5e7eb; color: #6b7280;
+  }
+  .book-note {
+    font-size: 12px; color: var(--warn);
+    background: #fef3c7;
+    padding: 4px 8px;
+    border-radius: 6px;
+    display: inline-block;
+  }
+  .book-card.done .book-note {
+    background: #e5e7eb; color: #6b7280;
+  }
+  .card-actions {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-top: auto;
+    padding-top: 4px;
+  }
+  .status-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .icon-done { background: #9ca3af; color: #fff; }
+  .icon-tbd { background: #fbbf24; color: #fff; }
+  .icon-release { background: var(--accent); color: #fff; }
+
+  .result-list {
+    display: flex; flex-direction: column; gap: 10px;
+    margin-top: 12px;
+  }
+  .result-item {
+    display: flex; gap: 12px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    background: var(--bg);
+  }
+  .result-item:hover { background: var(--bg-soft); }
+  .result-item img {
+    width: 56px; height: 80px;
+    background: var(--bg-soft);
+    border-radius: 4px;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+  .result-item .info { flex: 1; min-width: 0; }
+  .result-item .t { font-size: 14px; font-weight: 600; word-break: break-word; }
+  .result-item .m { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 40px 16px;
+    font-size: 14px;
+  }
+  .loading {
+    text-align: center;
+    color: var(--muted);
+    padding: 20px;
+    font-size: 13px;
+  }
+  .library-result {
+    margin-top: 4px;
+    padding: 8px;
+    background: var(--bg-soft);
+    border-radius: 6px;
+    font-size: 12px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .library-result .lib-row {
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .library-result .lib-row:last-child { border-bottom: none; }
+  .status-ok { color: var(--success); font-weight: 600; }
+  .status-no { color: var(--danger); }
+  .status-wait { color: var(--warn); }
+
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .row-inline {
+    display: flex; gap: 8px; align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .modal-back {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 50;
+    padding: 16px;
+  }
+  .modal-back.show { display: flex; }
+  .modal {
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 400px;
+    width: 100%;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+  }
+  .modal h3 { margin: 0 0 8px; font-size: 16px; }
+  .modal .target-title {
+    font-size: 13px; color: var(--muted);
+    margin-bottom: 12px;
+    word-break: break-word;
+  }
+  .modal-actions {
+    display: flex; justify-content: flex-end; gap: 8px;
+    margin-top: 16px;
+  }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%;
+    transform: translateX(-50%);
+    background: #1f2937; color: #fff;
+    padding: 10px 18px;
+    border-radius: 20px;
+    font-size: 13px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 100;
+    opacity: 0;
+    transition: opacity .2s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 480px) {
+    .title-bar h1 { font-size: 16px; }
+    .card-grid { grid-template-columns: 1fr; }
+    main { padding: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-bar">
+    <h1>📚 ラノベ管理</h1>
+    <span class="sub" id="book-count"></span>
+  </div>
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="shelf">本棚</button>
+    <button class="tab-btn" data-tab="add">本を追加</button>
+    <button class="tab-btn" data-tab="upcoming">発売予定</button>
+    <button class="tab-btn" data-tab="settings">設定</button>
+  </nav>
+</header>
+
+<main>
+  <!-- 本棚 -->
+  <section id="shelf" class="tab-panel active">
+    <div class="toolbar">
+      <input type="text" id="filter-input" placeholder="🔍 タイトルで絞り込み">
+      <select id="sort-select">
+        <option value="title-asc">タイトル（昇順）</option>
+        <option value="title-desc">タイトル（降順)</option>
+        <option value="id-asc">登録順</option>
+        <option value="status">ステータス順</option>
+      </select>
+    </div>
+    <div id="shelf-list"></div>
+  </section>
+
+  <!-- 本を追加 -->
+  <section id="add" class="tab-panel">
+    <h2>本を追加</h2>
+    <label for="search-input">タイトルで検索（openBD）</label>
+    <div class="toolbar">
+      <input type="text" id="search-input" placeholder="例：薬屋のひとりごと">
+      <button class="btn primary" id="search-btn">検索</button>
+    </div>
+    <p class="hint">検索結果をタップすると登録フォームが開きます。タイトルから直接追加することもできます。</p>
+    <div class="toolbar">
+      <input type="text" id="manual-input" placeholder="タイトルを直接入力して追加">
+      <button class="btn" id="manual-btn">追加</button>
+    </div>
+    <div id="search-results" class="result-list"></div>
+  </section>
+
+  <!-- 発売予定 -->
+  <section id="upcoming" class="tab-panel">
+    <h2>発売予定</h2>
+    <p class="hint">備考欄に発売日情報が入っている作品の一覧です。</p>
+    <div id="upcoming-list" style="margin-top:12px;"></div>
+  </section>
+
+  <!-- 設定 -->
+  <section id="settings" class="tab-panel">
+    <h2>設定</h2>
+
+    <label for="calil-key">カーリル APIキー</label>
+    <input type="text" id="calil-key" placeholder="カーリルのアプリキー">
+    <p class="hint">https://calil.jp/api/dashboard/ で無料取得できます。localStorageに保存されます。</p>
+
+    <label for="calil-systemid">図書館（systemid）</label>
+    <select id="calil-systemid">
+      <option value="Tokyo_Pref">東京都立図書館 (Tokyo_Pref)</option>
+      <option value="Osaka_Pref">大阪府立図書館 (Osaka_Pref)</option>
+      <option value="Aichi_Pref">愛知県図書館 (Aichi_Pref)</option>
+      <option value="Kanagawa_Pref">神奈川県立図書館 (Kanagawa_Pref)</option>
+      <option value="Hokkaido_Pref">北海道立図書館 (Hokkaido_Pref)</option>
+      <option value="Fukuoka_Pref">福岡県立図書館 (Fukuoka_Pref)</option>
+      <option value="Kyoto_Pref">京都府立図書館 (Kyoto_Pref)</option>
+      <option value="Hyogo_Pref">兵庫県立図書館 (Hyogo_Pref)</option>
+      <option value="Saitama_Pref">埼玉県立図書館 (Saitama_Pref)</option>
+      <option value="Chiba_Pref">千葉県立図書館 (Chiba_Pref)</option>
+      <option value="Miyagi_Pref">宮城県図書館 (Miyagi_Pref)</option>
+      <option value="Hiroshima_Pref">広島県立図書館 (Hiroshima_Pref)</option>
+      <option value="__custom__">カスタム入力…</option>
+    </select>
+    <input type="text" id="calil-systemid-custom" placeholder="例：Tokyo_Setagaya" style="display:none; margin-top:8px;">
+
+    <div style="margin-top:16px;">
+      <button class="btn primary" id="save-settings">保存</button>
+    </div>
+
+    <hr style="margin:24px 0; border:none; border-top:1px solid var(--border);">
+    <h2>データ管理</h2>
+    <div class="row-inline">
+      <button class="btn" id="export-btn">エクスポート</button>
+      <button class="btn" id="import-btn">インポート</button>
+      <input type="file" id="import-file" accept="application/json" style="display:none;">
+      <button class="btn danger" id="reset-btn">初期データに戻す</button>
+      <button class="btn danger" id="clear-btn">全削除</button>
+    </div>
+  </section>
+</main>
+
+<!-- 登録モーダル -->
+<div class="modal-back" id="modal-back">
+  <div class="modal">
+    <h3>登録</h3>
+    <div class="target-title" id="modal-target"></div>
+    <label for="modal-nextvol">次巻番号</label>
+    <input type="text" id="modal-nextvol" placeholder="例：12 / 3年生編4 / 第三部2">
+    <label for="modal-note">備考（空欄可）</label>
+    <input type="text" id="modal-note" placeholder="例：2025年秋発売 / 完結 / 未確定">
+    <div class="modal-actions">
+      <button class="btn" id="modal-cancel">キャンセル</button>
+      <button class="btn primary" id="modal-ok">登録</button>
+    </div>
+  </div>
+</div>
+
+<!-- 編集モーダル -->
+<div class="modal-back" id="edit-back">
+  <div class="modal">
+    <h3>編集</h3>
+    <div class="target-title" id="edit-target"></div>
+    <label for="edit-title">タイトル</label>
+    <input type="text" id="edit-title">
+    <label for="edit-nextvol">次巻番号（空欄で完結扱いに）</label>
+    <input type="text" id="edit-nextvol">
+    <label for="edit-note">備考</label>
+    <input type="text" id="edit-note">
+    <div class="modal-actions">
+      <button class="btn" id="edit-cancel">キャンセル</button>
+      <button class="btn primary" id="edit-ok">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= 初期データ ================= */
+const INITIAL_DATA = [
+  {"id": 1,  "title": "神達に拾われた男",                                "nextVol": "13",       "releaseNote": ""},
+  {"id": 2,  "title": "探偵はもう死んでいる",                            "nextVol": "4",        "releaseNote": ""},
+  {"id": 3,  "title": "お隣の天使様にいつの間にか駄目人間にされていた件", "nextVol": "11",       "releaseNote": ""},
+  {"id": 4,  "title": "佐々木とピーちゃん",                              "nextVol": "12",       "releaseNote": "2025年秋発売"},
+  {"id": 5,  "title": "ようこそ実力至上主義の教室へ",                    "nextVol": "3年生編4", "releaseNote": ""},
+  {"id": 6,  "title": "時々ボソッとロシア語でデレる隣のアーリャさん",    "nextVol": "11",       "releaseNote": ""},
+  {"id": 7,  "title": "オーバーロード",                                   "nextVol": "17",       "releaseNote": ""},
+  {"id": 8,  "title": "転生したらスライムだった件",                       "nextVol": "22",       "releaseNote": ""},
+  {"id": 9,  "title": "無職転生 ～異世界行ったら本気だす～",              "nextVol": "蛇足編4",  "releaseNote": ""},
+  {"id": 10, "title": "豚のレバーは加熱しろ",                             "nextVol": "5",        "releaseNote": ""},
+  {"id": 11, "title": "蜘蛛ですが、なにか?",                             "nextVol": null,       "releaseNote": "完結"},
+  {"id": 12, "title": "この素晴らしい世界に祝福を!",                     "nextVol": "12",       "releaseNote": ""},
+  {"id": 13, "title": "魔王学院の不適合者",                               "nextVol": "3",        "releaseNote": ""},
+  {"id": 14, "title": "ダンジョンに出会いを求めるのは間違っているだろうか","nextVol": "5",       "releaseNote": ""},
+  {"id": 15, "title": "86―エイティシックス―",                            "nextVol": "4",        "releaseNote": ""},
+  {"id": 16, "title": "青春ブタ野郎はバニーガール先輩の夢を見ない",       "nextVol": "2",        "releaseNote": ""},
+  {"id": 17, "title": "スパイ教室",                                       "nextVol": "9",        "releaseNote": ""},
+  {"id": 18, "title": "陰の実力者になりたくて!",                         "nextVol": "7",        "releaseNote": ""},
+  {"id": 19, "title": "ホヅミ先生と茉莉くんと。",                         "nextVol": "3",        "releaseNote": ""},
+  {"id": 20, "title": "薬屋のひとりごと",                                 "nextVol": "2",        "releaseNote": "小説版"},
+  {"id": 21, "title": "ひとりぼっちの異世界攻略",                         "nextVol": "2",        "releaseNote": ""},
+  {"id": 22, "title": "最弱テイマーはゴミ拾いの旅を始めました",           "nextVol": "16",       "releaseNote": ""},
+  {"id": 23, "title": "ユアフォルマ",                                     "nextVol": "4",        "releaseNote": ""},
+  {"id": 24, "title": "リコリス・リコイル",                               "nextVol": "3",        "releaseNote": "未確定"},
+  {"id": 25, "title": "魔導具師ダリヤはうつむかない",                     "nextVol": "13",       "releaseNote": ""},
+  {"id": 26, "title": "服飾師ルチアはあきらめない",                       "nextVol": "4",        "releaseNote": ""},
+  {"id": 27, "title": "誰が勇者を殺したか",                               "nextVol": "2",        "releaseNote": ""},
+  {"id": 28, "title": "涼宮ハルヒの憂鬱",                                 "nextVol": "2",        "releaseNote": ""},
+  {"id": 29, "title": "狼と香辛料",                                       "nextVol": "3",        "releaseNote": ""},
+  {"id": 30, "title": "嘆きの亡霊は引退したい",                           "nextVol": "3",        "releaseNote": ""},
+  {"id": 31, "title": "天久鷹央の推理カルテ",                             "nextVol": "2",        "releaseNote": ""},
+  {"id": 32, "title": "水属性の魔法使い",                                 "nextVol": "第三部2",  "releaseNote": ""},
+  {"id": 33, "title": "神は遊戯に飢えている",                             "nextVol": "2",        "releaseNote": ""},
+  {"id": 34, "title": "護衛騎士ヨナスはふりむかない",                     "nextVol": "2",        "releaseNote": "発売日未定"}
+];
+
+/* ================= 保存 ================= */
+const LS_KEY = 'ln_library';
+const LS_SETTINGS = 'ln_settings';
+
+function loadLibrary() {
+  try {
+    const s = localStorage.getItem(LS_KEY);
+    if (s == null) {
+      localStorage.setItem(LS_KEY, JSON.stringify(INITIAL_DATA));
+      return JSON.parse(JSON.stringify(INITIAL_DATA));
+    }
+    return JSON.parse(s);
+  } catch { return JSON.parse(JSON.stringify(INITIAL_DATA)); }
+}
+function saveLibrary(list) {
+  localStorage.setItem(LS_KEY, JSON.stringify(list));
+}
+function loadSettings() {
+  try { return JSON.parse(localStorage.getItem(LS_SETTINGS) || '{}'); }
+  catch { return {}; }
+}
+function saveSettings(obj) {
+  localStorage.setItem(LS_SETTINGS, JSON.stringify(obj));
+}
+
+let library = loadLibrary();
+let settings = loadSettings();
+
+/* ================= ユーティリティ ================= */
+function $(sel) { return document.querySelector(sel); }
+function $$(sel) { return Array.from(document.querySelectorAll(sel)); }
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function nextId() {
+  const max = library.reduce((m, b) => Math.max(m, b.id || 0), 0);
+  return max + 1;
+}
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._tid);
+  toast._tid = setTimeout(() => t.classList.remove('show'), 2000);
+}
+function amazonUrl(title, vol) {
+  const q = vol ? `${title} ${vol}巻` : title;
+  return 'https://www.amazon.co.jp/s?k=' + encodeURIComponent(q);
+}
+function isDone(b) {
+  return (b.nextVol == null || b.nextVol === '') || /完結/.test(b.releaseNote || '');
+}
+function isTbd(b) {
+  return /未確定|未定/.test(b.releaseNote || '');
+}
+
+/* ================= タブ ================= */
+$$('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    activateTab(tab);
+  });
+});
+function activateTab(tab) {
+  $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  $$('.tab-panel').forEach(p => p.classList.toggle('active', p.id === tab));
+  if (tab === 'upcoming') renderUpcoming();
+}
+
+/* ================= 本棚 ================= */
+function sortLibrary(list, mode) {
+  const coll = new Intl.Collator('ja');
+  const arr = list.slice();
+  if (mode === 'title-asc') arr.sort((a, b) => coll.compare(a.title, b.title));
+  else if (mode === 'title-desc') arr.sort((a, b) => coll.compare(b.title, a.title));
+  else if (mode === 'id-asc') arr.sort((a, b) => (a.id || 0) - (b.id || 0));
+  else if (mode === 'status') {
+    arr.sort((a, b) => {
+      const rank = (x) => {
+        if (x.releaseNote && !/完結/.test(x.releaseNote)) return 0; // 発売予定
+        if (isTbd(x)) return 1;
+        if (isDone(x)) return 3;
+        return 2; // 通常
+      };
+      const ra = rank(a), rb = rank(b);
+      if (ra !== rb) return ra - rb;
+      return coll.compare(a.title, b.title);
+    });
+  }
+  return arr;
+}
+
+function render() {
+  $('#book-count').textContent = library.length ? `${library.length} シリーズ` : '';
+  const list = $('#shelf-list');
+  if (library.length === 0) {
+    list.innerHTML = '<div class="empty">📖 本棚は空です。<br>「本を追加」タブから登録してみましょう。</div>';
+    return;
+  }
+  const filter = ($('#filter-input').value || '').trim().toLowerCase();
+  const sortMode = $('#sort-select').value;
+  let items = library.slice();
+  if (filter) items = items.filter(b => (b.title || '').toLowerCase().includes(filter));
+  items = sortLibrary(items, sortMode);
+
+  if (items.length === 0) {
+    list.innerHTML = '<div class="empty">該当する作品がありません。</div>';
+    return;
+  }
+
+  const html = items.map(b => {
+    const done = isDone(b);
+    const tbd = isTbd(b);
+    const hasRelease = b.releaseNote && !/完結/.test(b.releaseNote) && !tbd;
+    const icons = [];
+    if (done) icons.push('<span class="status-icon icon-done" title="完結">✓</span>');
+    if (tbd) icons.push('<span class="status-icon icon-tbd" title="未確定">?</span>');
+    if (hasRelease) icons.push('<span class="status-icon icon-release" title="発売情報あり">!</span>');
+    const volLabel = done
+      ? '<span class="vol" style="background:#e5e7eb;color:#6b7280;">完結</span>'
+      : `<span class="vol">次巻 ${esc(b.nextVol)}</span>`;
+    const amazon = amazonUrl(b.title, done ? null : b.nextVol);
+    return `
+      <div class="book-card ${done ? 'done' : ''}" data-id="${esc(b.id)}">
+        <div class="book-title">${icons.join('')} ${esc(b.title)}</div>
+        <div class="book-meta">${volLabel}</div>
+        ${b.releaseNote ? `<div class="book-note">📅 ${esc(b.releaseNote)}</div>` : ''}
+        <div class="card-actions">
+          <a class="btn small primary" target="_blank" rel="noopener" href="${esc(amazon)}">Amazonで確認</a>
+          <button class="btn small" data-act="lib" data-id="${esc(b.id)}">図書館で探す</button>
+          <button class="btn small" data-act="edit" data-id="${esc(b.id)}">編集</button>
+          <button class="btn small danger" data-act="del" data-id="${esc(b.id)}">削除</button>
+        </div>
+        <div class="library-result" id="lib-${esc(b.id)}" style="display:none;"></div>
+      </div>
+    `;
+  }).join('');
+  list.innerHTML = `<div class="card-grid">${html}</div>`;
+
+  list.querySelectorAll('[data-act]').forEach(el => el.addEventListener('click', onCardAction));
+}
+
+function onCardAction(e) {
+  const act = e.currentTarget.dataset.act;
+  const id = parseInt(e.currentTarget.dataset.id, 10);
+  const b = library.find(x => x.id === id);
+  if (!b) return;
+  if (act === 'del') {
+    if (confirm(`「${b.title}」を削除しますか？`)) {
+      library = library.filter(x => x.id !== id);
+      saveLibrary(library);
+      render();
+      toast('削除しました');
+    }
+  } else if (act === 'edit') {
+    openEditModal(b);
+  } else if (act === 'lib') {
+    checkLibrary(b);
+  }
+}
+
+/* ================= 図書館確認（カーリル） ================= */
+function jsonp(url, cbParam) {
+  return new Promise((resolve, reject) => {
+    const name = '_calil_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    const timer = setTimeout(() => { cleanup(); reject(new Error('カーリルAPI timeout')); }, 15000);
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[name];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[name] = (data) => { cleanup(); resolve(data); };
+    const sep = url.includes('?') ? '&' : '?';
+    script.src = `${url}${sep}${cbParam}=${name}`;
+    script.onerror = () => { cleanup(); reject(new Error('カーリルAPI 読み込み失敗')); };
+    document.body.appendChild(script);
+  });
+}
+
+async function calilCheckByIsbn(isbn, systemid, appkey) {
+  const base = 'https://api.calil.jp/check';
+  let url = `${base}?appkey=${encodeURIComponent(appkey)}&isbn=${encodeURIComponent(isbn)}&systemid=${encodeURIComponent(systemid)}&format=json`;
+  let data = await jsonp(url, 'callback');
+  let safety = 0;
+  while (data && data.continue === 1 && safety < 8) {
+    await new Promise(r => setTimeout(r, 2200));
+    url = `${base}?appkey=${encodeURIComponent(appkey)}&session=${encodeURIComponent(data.session)}&format=json`;
+    data = await jsonp(url, 'callback');
+    safety++;
+  }
+  return data;
+}
+
+async function openbdSearchIsbn(title) {
+  try {
+    const url = `https://api.openbd.jp/v1/search?title=${encodeURIComponent(title)}&limit=5`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      for (const item of data) {
+        if (!item) continue;
+        if (typeof item === 'string') return item;
+        if (item.isbn) return item.isbn;
+        if (item.summary && item.summary.isbn) return item.summary.isbn;
+      }
+    } else if (data && Array.isArray(data.hits)) {
+      for (const h of data.hits) if (h && h.isbn) return h.isbn;
+    }
+  } catch {}
+  return null;
+}
+
+async function checkLibrary(book) {
+  const box = document.getElementById('lib-' + book.id);
+  if (!box) return;
+  const appkey = settings.calilKey || '';
+  const systemid = settings.calilSystemid || '';
+  if (!appkey || !systemid) {
+    if (confirm('カーリルAPIキー（または図書館）が未設定です。\n設定タブを開きますか？')) {
+      activateTab('settings');
+    }
+    return;
+  }
+  box.style.display = 'block';
+  box.innerHTML = '<div class="loading">ISBN を取得中…</div>';
+  try {
+    const isbn = await openbdSearchIsbn(book.title);
+    if (!isbn) {
+      box.innerHTML = '<div class="status-no">ISBN が見つかりませんでした。</div>';
+      return;
+    }
+    box.innerHTML = `<div class="loading">図書館を照会中…（ISBN: ${esc(isbn)}）</div>`;
+    const data = await calilCheckByIsbn(isbn, systemid, appkey);
+    renderLibraryResult(box, data, systemid, isbn);
+  } catch (e) {
+    box.innerHTML = `<div class="status-no">エラー: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderLibraryResult(box, data, systemid, isbn) {
+  if (!data || !data.books || !data.books[isbn]) {
+    box.innerHTML = '<div class="status-no">結果なし</div>';
+    return;
+  }
+  const sys = data.books[isbn][systemid];
+  if (!sys) { box.innerHTML = '<div class="status-no">この図書館では該当なし</div>'; return; }
+  const libkey = sys.libkey || {};
+  const keys = Object.keys(libkey);
+  let html = '';
+  if (keys.length === 0) {
+    const status = sys.status || '不明';
+    html = `<div class="status-no">所蔵なし（${esc(status)}）</div>`;
+  } else {
+    html = keys.map(k => {
+      const s = libkey[k] || '';
+      let cls = 'status-wait';
+      if (/貸出可|蔵書あり/.test(s)) cls = 'status-ok';
+      else if (/貸出中|予約中/.test(s)) cls = 'status-wait';
+      else if (/なし/.test(s)) cls = 'status-no';
+      return `<div class="lib-row"><span class="${cls}">${esc(s)}</span> — ${esc(k)}</div>`;
+    }).join('');
+  }
+  if (sys.reserveurl) {
+    html += `<div style="margin-top:6px;"><a class="btn small" target="_blank" rel="noopener" href="${esc(sys.reserveurl)}">予約ページを開く</a></div>`;
+  }
+  box.innerHTML = html;
+}
+
+/* ================= 絞り込み・ソート ================= */
+$('#filter-input').addEventListener('input', render);
+$('#sort-select').addEventListener('change', render);
+
+/* ================= 追加タブ ================= */
+$('#search-btn').addEventListener('click', doSearch);
+$('#search-input').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+$('#manual-btn').addEventListener('click', () => {
+  const v = $('#manual-input').value.trim();
+  if (!v) return;
+  openAddModal({ title: v });
+  $('#manual-input').value = '';
+});
+$('#manual-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') $('#manual-btn').click();
+});
+
+async function doSearch() {
+  const q = $('#search-input').value.trim();
+  const box = $('#search-results');
+  if (!q) return;
+  box.innerHTML = '<div class="loading">検索中…</div>';
+  try {
+    const books = await openbdSearch(q);
+    renderSearchResults(books);
+  } catch (e) {
+    box.innerHTML = `<div class="empty">エラー: ${esc(e.message)}</div>`;
+  }
+}
+
+async function openbdSearch(title) {
+  const url = `https://api.openbd.jp/v1/search?title=${encodeURIComponent(title)}&limit=20`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('openBD HTTP ' + res.status);
+  const data = await res.json();
+  let isbns = [];
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      if (!item) continue;
+      if (typeof item === 'string') isbns.push(item);
+      else if (item.isbn) isbns.push(item.isbn);
+      else if (item.summary && item.summary.isbn) isbns.push(item.summary.isbn);
+    }
+  } else if (data && Array.isArray(data.hits)) {
+    for (const h of data.hits) if (h && h.isbn) isbns.push(h.isbn);
+  }
+  isbns = Array.from(new Set(isbns.filter(Boolean))).slice(0, 20);
+  if (isbns.length === 0) return [];
+  const getUrl = `https://api.openbd.jp/v1/get?isbn=${isbns.join(',')}`;
+  const gr = await fetch(getUrl);
+  if (!gr.ok) throw new Error('openBD get HTTP ' + gr.status);
+  const gd = await gr.json();
+  return (gd || []).filter(Boolean).map(raw => {
+    const s = raw.summary || {};
+    return {
+      isbn: s.isbn || '',
+      title: s.title || '(無題)',
+      author: s.author || '',
+      publisher: s.publisher || '',
+      pubdate: s.pubdate || '',
+      cover: s.cover || (s.isbn ? `https://cover.openbd.jp/${s.isbn}.jpg` : ''),
+    };
+  });
+}
+
+function renderSearchResults(books) {
+  const box = $('#search-results');
+  if (!books || books.length === 0) {
+    box.innerHTML = '<div class="empty">該当なし。タイトルを直接追加することもできます。</div>';
+    return;
+  }
+  box.innerHTML = books.map((b, i) => `
+    <div class="result-item" data-i="${i}">
+      <img src="${esc(b.cover || '')}" onerror="this.style.visibility='hidden'" alt="">
+      <div class="info">
+        <div class="t">${esc(b.title)}</div>
+        <div class="m">${esc(b.author || '')}${b.publisher ? ' / ' + esc(b.publisher) : ''}</div>
+        <div class="m">${esc(b.pubdate || '')}</div>
+      </div>
+    </div>
+  `).join('');
+  box.querySelectorAll('.result-item').forEach((el, i) => {
+    el.addEventListener('click', () => openAddModal(books[i]));
+  });
+}
+
+/* ================= 登録モーダル ================= */
+let pendingBook = null;
+function openAddModal(book) {
+  pendingBook = book;
+  $('#modal-target').textContent = book.title;
+  $('#modal-nextvol').value = '1';
+  $('#modal-note').value = '';
+  $('#modal-back').classList.add('show');
+  setTimeout(() => $('#modal-nextvol').focus(), 50);
+}
+function closeAddModal() {
+  $('#modal-back').classList.remove('show');
+  pendingBook = null;
+}
+$('#modal-cancel').addEventListener('click', closeAddModal);
+$('#modal-back').addEventListener('click', e => { if (e.target.id === 'modal-back') closeAddModal(); });
+$('#modal-ok').addEventListener('click', () => {
+  if (!pendingBook) return;
+  const nextVol = $('#modal-nextvol').value.trim();
+  const note = $('#modal-note').value.trim();
+  library.push({
+    id: nextId(),
+    title: pendingBook.title,
+    nextVol: nextVol === '' ? null : nextVol,
+    releaseNote: note,
+  });
+  saveLibrary(library);
+  closeAddModal();
+  render();
+  toast('追加しました');
+  activateTab('shelf');
+});
+
+/* ================= 編集モーダル ================= */
+let editingId = null;
+function openEditModal(book) {
+  editingId = book.id;
+  $('#edit-target').textContent = `ID: ${book.id}`;
+  $('#edit-title').value = book.title || '';
+  $('#edit-nextvol').value = book.nextVol == null ? '' : book.nextVol;
+  $('#edit-note').value = book.releaseNote || '';
+  $('#edit-back').classList.add('show');
+}
+function closeEditModal() {
+  $('#edit-back').classList.remove('show');
+  editingId = null;
+}
+$('#edit-cancel').addEventListener('click', closeEditModal);
+$('#edit-back').addEventListener('click', e => { if (e.target.id === 'edit-back') closeEditModal(); });
+$('#edit-ok').addEventListener('click', () => {
+  if (editingId == null) return;
+  const b = library.find(x => x.id === editingId);
+  if (!b) { closeEditModal(); return; }
+  b.title = $('#edit-title').value.trim() || b.title;
+  const v = $('#edit-nextvol').value.trim();
+  b.nextVol = v === '' ? null : v;
+  b.releaseNote = $('#edit-note').value.trim();
+  saveLibrary(library);
+  closeEditModal();
+  render();
+  toast('保存しました');
+});
+
+/* ================= 発売予定 ================= */
+function renderUpcoming() {
+  const list = $('#upcoming-list');
+  const items = library.filter(b => b.releaseNote && !/完結/.test(b.releaseNote));
+  if (items.length === 0) {
+    list.innerHTML = '<div class="empty">発売情報が登録されている作品はありません。</div>';
+    return;
+  }
+  list.innerHTML = items.map(b => {
+    const tbd = isTbd(b);
+    const icon = tbd
+      ? '<span class="status-icon icon-tbd" title="未確定">?</span>'
+      : '<span class="status-icon icon-release" title="発売情報">!</span>';
+    const amazon = amazonUrl(b.title, b.nextVol);
+    return `
+      <div class="book-card">
+        <div class="book-title">${icon} ${esc(b.title)}</div>
+        <div class="book-meta"><span class="vol">次巻 ${esc(b.nextVol || '?')}</span></div>
+        <div class="book-note">📅 ${esc(b.releaseNote)}</div>
+        <div class="card-actions">
+          <a class="btn small primary" target="_blank" rel="noopener" href="${esc(amazon)}">Amazonで確認</a>
+          <button class="btn small" data-act="edit" data-id="${esc(b.id)}">編集</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  list.querySelectorAll('[data-act="edit"]').forEach(el => el.addEventListener('click', (e) => {
+    const id = parseInt(e.currentTarget.dataset.id, 10);
+    const b = library.find(x => x.id === id);
+    if (b) openEditModal(b);
+  }));
+}
+
+/* ================= 設定 ================= */
+function applySettingsToForm() {
+  $('#calil-key').value = settings.calilKey || '';
+  const sel = $('#calil-systemid');
+  const custom = $('#calil-systemid-custom');
+  const sid = settings.calilSystemid || 'Tokyo_Pref';
+  const options = Array.from(sel.options).map(o => o.value);
+  if (options.includes(sid)) {
+    sel.value = sid;
+    custom.style.display = 'none';
+  } else {
+    sel.value = '__custom__';
+    custom.style.display = 'block';
+    custom.value = sid;
+  }
+}
+$('#calil-systemid').addEventListener('change', () => {
+  $('#calil-systemid-custom').style.display =
+    $('#calil-systemid').value === '__custom__' ? 'block' : 'none';
+});
+$('#save-settings').addEventListener('click', () => {
+  settings.calilKey = $('#calil-key').value.trim();
+  const sel = $('#calil-systemid').value;
+  settings.calilSystemid = sel === '__custom__'
+    ? $('#calil-systemid-custom').value.trim()
+    : sel;
+  saveSettings(settings);
+  toast('保存しました');
+});
+
+/* データ管理 */
+$('#export-btn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify({ library, settings }, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'ln_library_backup.json'; a.click();
+  URL.revokeObjectURL(url);
+});
+$('#import-btn').addEventListener('click', () => $('#import-file').click());
+$('#import-file').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const txt = await f.text();
+    const data = JSON.parse(txt);
+    if (Array.isArray(data)) {
+      library = data;
+    } else {
+      if (Array.isArray(data.library)) library = data.library;
+      if (data.settings) { settings = data.settings; saveSettings(settings); }
+    }
+    saveLibrary(library);
+    applySettingsToForm(); render();
+    toast('インポートしました');
+  } catch (err) { alert('インポート失敗: ' + err.message); }
+  e.target.value = '';
+});
+$('#reset-btn').addEventListener('click', () => {
+  if (confirm('初期データに戻しますか？現在のデータは消えます。')) {
+    library = JSON.parse(JSON.stringify(INITIAL_DATA));
+    saveLibrary(library);
+    render();
+    toast('初期データに戻しました');
+  }
+});
+$('#clear-btn').addEventListener('click', () => {
+  if (confirm('本棚データを全て削除しますか？この操作は取り消せません。')) {
+    library = [];
+    saveLibrary(library);
+    render();
+    toast('削除しました');
+  }
+});
+
+/* ================= 初期化 ================= */
+applySettingsToForm();
+render();
+</script>
+</body>
+</html>
