@@ -50,14 +50,34 @@ async function fetchJson(url) {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 /* ------------ Parsing helpers ------------ */
+/* 句読点・空白を除去して比較用に正規化 */
+function normalizeTitle(s) {
+  if (!s) return '';
+  return s
+    .replace(/[\s\u3000]+/g, '')
+    .replace(/[、。・!?！？,.\-―ー~〜「」『』【】〈〉《》\(\)（）\[\]]/g, '')
+    .toLowerCase();
+}
+
 function extractVolume(title) {
   if (!title) return null;
-  // "〇〇 12巻", "〇〇 12", "〇〇12"
-  let m = title.match(/(\d+)\s*巻/);
+  // "〇〇 12巻" "第12巻"
+  let m = title.match(/第?\s*(\d+)\s*巻/);
   if (m) return parseInt(m[1], 10);
+  // "(12)" "（12）"
   m = title.match(/[\(（]\s*(\d+)\s*[\)）]/);
   if (m) return parseInt(m[1], 10);
-  // trailing number
+  // 全角数字
+  const zen = '０１２３４５６７８９';
+  const zenM = title.match(/[０-９]+/);
+  if (zenM) {
+    let n = 0;
+    for (const c of zenM[0]) n = n * 10 + zen.indexOf(c);
+    if (n > 0) return n;
+  }
+  // trailing or isolated number near end (after space/symbol)
+  m = title.match(/[\s　・]+(\d+)(?:\s|$)/);
+  if (m) return parseInt(m[1], 10);
   m = title.match(/(\d+)\s*$/);
   if (m) return parseInt(m[1], 10);
   return null;
@@ -92,25 +112,33 @@ function formatPubdate(pubdate) {
   return pubdate;
 }
 
-/* ------------ NDL (書名検索) & openBD (詳細取得) ------------ */
-// openBD は /v1/get (ISBN指定) のみ提供し、タイトル検索エンドポイントは存在しない。
-// そのため NDL サーチから ISBN を取得してから openBD で詳細を取得する。
-async function ndlSearchIsbns(title) {
-  const url = `https://ndlsearch.ndl.go.jp/api/opensearch?title=${encodeURIComponent(title)}&cnt=30`;
-  const xml = await fetchText(url, 'application/xml, text/xml, */*');
-  const isbns = [];
-  const seen = new Set();
-  // <dc:identifier xsi:type="dcndl:ISBN">9784...</dc:identifier>
-  const re = /<dc:identifier[^>]*ISBN[^>]*>([0-9X\-]+)<\/dc:identifier>/gi;
-  let m;
-  while ((m = re.exec(xml)) !== null) {
-    const isbn = m[1].replace(/[-\s]/g, '');
-    if ((isbn.length === 13 || isbn.length === 10) && !seen.has(isbn)) {
-      seen.add(isbn);
-      isbns.push(isbn);
-    }
+/* ------------ NDL opensearch & openBD ------------ */
+// openBD にはタイトル検索エンドポイントがないため、NDLサーチから取得する
+// <item>要素を解析して title/pubDate/ISBN を抽出する
+function parseNdlItems(xml) {
+  const items = [];
+  const itemRe = /<item>([\s\S]*?)<\/item>/g;
+  let im;
+  while ((im = itemRe.exec(xml)) !== null) {
+    const chunk = im[1];
+    const titleM = chunk.match(/<title>([^<]+)<\/title>/);
+    const pubDateM = chunk.match(/<pubDate>([^<]+)<\/pubDate>/);
+    const dcDateM = chunk.match(/<dc:date[^>]*>([^<]+)<\/dc:date>/);
+    const isbnM = chunk.match(/<dc:identifier[^>]*ISBN[^>]*>([0-9X\-]+)<\/dc:identifier>/i);
+    items.push({
+      title: titleM ? titleM[1] : '',
+      pubDateRaw: pubDateM ? pubDateM[1] : '',
+      dcDate: dcDateM ? dcDateM[1] : '', // e.g. "2024-05-23"
+      isbn: isbnM ? isbnM[1].replace(/[-\s]/g, '') : ''
+    });
   }
-  return isbns.slice(0, 30);
+  return items;
+}
+
+async function ndlSearch(title) {
+  const url = `https://ndlsearch.ndl.go.jp/api/opensearch?title=${encodeURIComponent(title)}&cnt=50`;
+  const xml = await fetchText(url, 'application/xml, text/xml, */*');
+  return parseNdlItems(xml);
 }
 
 async function openbdGet(isbns) {
@@ -120,39 +148,62 @@ async function openbdGet(isbns) {
   return (data || []).filter(Boolean);
 }
 
+/* dc:date "2024-05-23" → "20240523" */
+function dcDateToPubdate(d) {
+  if (!d) return '';
+  const m = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + m[2] + m[3];
+  const y = d.match(/^(\d{4})-(\d{2})/);
+  if (y) return y[1] + y[2];
+  return '';
+}
+
+/* 常に除外したいフォーマット(音楽・映像) */
+function isHardExcluded(title) {
+  if (!title) return true;
+  return /オーディオブック|朗読|サウンドトラック|カヴァー|カバー曲|主題歌|オープニング|エンディング|アニソン|OST|blu-?ray|dvd|b-side/i.test(title);
+}
+/* 電子分冊版・合本版などの「フォールバック扱い」フォーマット */
+function isDigitalOnly(title) {
+  if (!title) return false;
+  return /【分冊版】|【合本版】|分冊版|合本版/.test(title);
+}
+
 /* ------------ Find latest volume for a title ------------ */
 async function findLatest(title) {
-  const isbns = await ndlSearchIsbns(title);
-  if (isbns.length === 0) return null;
-  await sleep(REQUEST_WAIT_MS);
+  const items = await ndlSearch(title);
+  if (items.length === 0) return null;
 
-  // Process in chunks of 10 to keep URL short
-  const details = [];
-  for (let i = 0; i < isbns.length; i += 10) {
-    const chunk = isbns.slice(i, i + 10);
-    const part = await openbdGet(chunk);
-    details.push(...part);
-    if (i + 10 < isbns.length) await sleep(REQUEST_WAIT_MS);
-  }
-
-  const candidates = [];
-  for (const d of details) {
-    if (!d || !d.summary) continue;
-    const s = d.summary;
-    if (!s.title) continue;
-    // Loose title match: result title should contain the query series name
-    // or vice versa (for short series titles)
-    if (!s.title.includes(title) && !title.includes(s.title.replace(/\s*\d+.*$/, '').trim())) {
+  const normQuery = normalizeTitle(title);
+  const preferred = []; // 物理書籍
+  const fallback = []; // 電子分冊版などの代替
+  for (const it of items) {
+    if (!it.title) continue;
+    if (isHardExcluded(it.title)) continue;
+    const normResult = normalizeTitle(it.title);
+    // 正規化後にクエリを含んでいる or クエリが結果(巻数除去後)を含む
+    const resultNoVol = normResult.replace(/\d+.*$/, '');
+    if (!normResult.includes(normQuery) && !(resultNoVol && normQuery.includes(resultNoVol))) {
       continue;
     }
-    candidates.push({
-      isbn: s.isbn || '',
-      title: s.title,
-      pubdate: s.pubdate || '',
-      volume: extractVolume(s.title)
-    });
+    const entry = {
+      isbn: it.isbn,
+      title: it.title,
+      pubdate: dcDateToPubdate(it.dcDate),
+      volume: extractVolume(it.title)
+    };
+    if (isDigitalOnly(it.title)) fallback.push(entry);
+    else preferred.push(entry);
   }
 
+  let candidates;
+  let isDigitalFallback = false;
+  if (preferred.length > 0) {
+    candidates = preferred;
+  } else {
+    candidates = fallback;
+    isDigitalFallback = true;
+  }
   if (candidates.length === 0) return null;
 
   // Sort: latest pubdate first, then highest volume
@@ -163,7 +214,28 @@ async function findLatest(title) {
     return (b.volume || 0) - (a.volume || 0);
   });
 
-  return candidates[0];
+  const top = candidates[0];
+  if (isDigitalFallback) {
+    // 分冊版の"巻数"は実巻数ではないので無効化
+    top.volume = null;
+  }
+
+  // ISBNがあれば openBD で詳細データ(特に正確な pubdate)を取得して上書き
+  if (top.isbn) {
+    try {
+      await sleep(REQUEST_WAIT_MS);
+      const details = await openbdGet([top.isbn]);
+      if (details.length > 0 && details[0].summary) {
+        const s = details[0].summary;
+        if (s.pubdate) top.pubdate = s.pubdate;
+        if (s.title) top.title = s.title;
+      }
+    } catch (e) {
+      // openBD失敗は無視(NDLデータで続行)
+    }
+  }
+
+  return top;
 }
 
 /* ------------ Main ------------ */
