@@ -895,23 +895,29 @@ async function doSearch() {
   }
 }
 
-async function openbdSearch(title) {
-  const url = `https://api.openbd.jp/v1/search?title=${encodeURIComponent(title)}&limit=20`;
+/* NDL サーチでISBN一覧を取得(openBDにはタイトル検索がないため) */
+async function ndlSearchIsbns(title) {
+  const url = `https://ndlsearch.ndl.go.jp/api/opensearch?title=${encodeURIComponent(title)}&cnt=30`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error('openBD HTTP ' + res.status);
-  const data = await res.json();
-  let isbns = [];
-  if (Array.isArray(data)) {
-    for (const item of data) {
-      if (!item) continue;
-      if (typeof item === 'string') isbns.push(item);
-      else if (item.isbn) isbns.push(item.isbn);
-      else if (item.summary && item.summary.isbn) isbns.push(item.summary.isbn);
+  if (!res.ok) return [];
+  const xml = await res.text();
+  const isbns = [];
+  const seen = new Set();
+  const re = /<dc:identifier[^>]*ISBN[^>]*>([0-9X\-]+)<\/dc:identifier>/gi;
+  let m;
+  while ((m = re.exec(xml)) !== null) {
+    const isbn = m[1].replace(/[-\s]/g, '');
+    if ((isbn.length === 13 || isbn.length === 10) && !seen.has(isbn)) {
+      seen.add(isbn);
+      isbns.push(isbn);
     }
-  } else if (data && Array.isArray(data.hits)) {
-    for (const h of data.hits) if (h && h.isbn) isbns.push(h.isbn);
   }
-  isbns = Array.from(new Set(isbns.filter(Boolean))).slice(0, 20);
+  return isbns.slice(0, 20);
+}
+
+async function openbdSearch(title) {
+  // openBDにはタイトル検索APIがないため、NDLサーチ経由でISBNを得る
+  const isbns = await ndlSearchIsbns(title);
   if (isbns.length === 0) return [];
   const getUrl = `https://api.openbd.jp/v1/get?isbn=${isbns.join(',')}`;
   const gr = await fetch(getUrl);

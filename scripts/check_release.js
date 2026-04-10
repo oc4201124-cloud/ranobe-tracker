@@ -19,11 +19,11 @@ const OUTPUT_JSON  = path.join(__dirname, '..', 'release_info.json');
 const REQUEST_WAIT_MS = 500;
 
 /* ------------ HTTP helpers ------------ */
-function fetchJson(url) {
+function fetchText(url, acceptHeader) {
   return new Promise((resolve, reject) => {
     const req = https.get(url, {
       headers: {
-        'Accept': 'application/json',
+        'Accept': acceptHeader || '*/*',
         'User-Agent': 'ranobe-tracker-bot (github.com/oc4201124-cloud/ranobe-tracker)'
       }
     }, (res) => {
@@ -34,14 +34,17 @@ function fetchJson(url) {
       let data = '';
       res.setEncoding('utf8');
       res.on('data', (chunk) => { data += chunk; });
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch (e) { reject(new Error('JSON parse error: ' + e.message)); }
-      });
+      res.on('end', () => resolve(data));
     });
     req.on('error', reject);
-    req.setTimeout(15000, () => { req.destroy(new Error('Request timeout')); });
+    req.setTimeout(20000, () => { req.destroy(new Error('Request timeout')); });
   });
+}
+
+async function fetchJson(url) {
+  const text = await fetchText(url, 'application/json');
+  try { return JSON.parse(text); }
+  catch (e) { throw new Error('JSON parse error: ' + e.message); }
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -89,22 +92,25 @@ function formatPubdate(pubdate) {
   return pubdate;
 }
 
-/* ------------ openBD helpers ------------ */
-async function openbdSearch(title) {
-  const url = `https://api.openbd.jp/v1/search?title=${encodeURIComponent(title)}&limit=20`;
-  const data = await fetchJson(url);
-  let isbns = [];
-  if (Array.isArray(data)) {
-    for (const item of data) {
-      if (!item) continue;
-      if (typeof item === 'string') isbns.push(item);
-      else if (item.isbn) isbns.push(item.isbn);
-      else if (item.summary && item.summary.isbn) isbns.push(item.summary.isbn);
+/* ------------ NDL (書名検索) & openBD (詳細取得) ------------ */
+// openBD は /v1/get (ISBN指定) のみ提供し、タイトル検索エンドポイントは存在しない。
+// そのため NDL サーチから ISBN を取得してから openBD で詳細を取得する。
+async function ndlSearchIsbns(title) {
+  const url = `https://ndlsearch.ndl.go.jp/api/opensearch?title=${encodeURIComponent(title)}&cnt=30`;
+  const xml = await fetchText(url, 'application/xml, text/xml, */*');
+  const isbns = [];
+  const seen = new Set();
+  // <dc:identifier xsi:type="dcndl:ISBN">9784...</dc:identifier>
+  const re = /<dc:identifier[^>]*ISBN[^>]*>([0-9X\-]+)<\/dc:identifier>/gi;
+  let m;
+  while ((m = re.exec(xml)) !== null) {
+    const isbn = m[1].replace(/[-\s]/g, '');
+    if ((isbn.length === 13 || isbn.length === 10) && !seen.has(isbn)) {
+      seen.add(isbn);
+      isbns.push(isbn);
     }
-  } else if (data && Array.isArray(data.hits)) {
-    for (const h of data.hits) if (h && h.isbn) isbns.push(h.isbn);
   }
-  return Array.from(new Set(isbns.filter(Boolean)));
+  return isbns.slice(0, 30);
 }
 
 async function openbdGet(isbns) {
@@ -116,7 +122,7 @@ async function openbdGet(isbns) {
 
 /* ------------ Find latest volume for a title ------------ */
 async function findLatest(title) {
-  const isbns = await openbdSearch(title);
+  const isbns = await ndlSearchIsbns(title);
   if (isbns.length === 0) return null;
   await sleep(REQUEST_WAIT_MS);
 
