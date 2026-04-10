@@ -1,54 +1,61 @@
 {
-  "updated_at": "2026-04-10T09:14:52.009Z",
+  "updated_at": "2026-04-10T11:29:36.794Z",
   "books": [
     {
       "title": "神達に拾われた男",
-      "latest_isbn": "9784798641256",
-      "latest_vol": "18",
-      "pubdate": "",
-      "pubdate_display": ""
+      "latest_isbn": "9784301005018",
+      "latest_vol": "16",
+      "pubdate": "20260507",
+      "pubdate_display": "2026年5月7日発売予定"
+    },
+    {
+      "title": "探偵はもう、死んでいる",
+      "latest_isbn": "9784046839176",
+      "latest_vol": "",
+      "pubdate": "202408",
+      "pubdate_display": "2024年8月発売"
     },
     {
       "title": "お隣の天使様にいつの間にか駄目人間にされていた件",
-      "latest_isbn": "9784815637576",
-      "latest_vol": "12",
-      "pubdate": "",
-      "pubdate_display": ""
+      "latest_isbn": "9784757593428",
+      "latest_vol": "",
+      "pubdate": "202408",
+      "pubdate_display": "2024年8月発売"
     },
     {
       "title": "佐々木とピーちゃん",
-      "latest_isbn": "9784041141212",
-      "latest_vol": "3",
-      "pubdate": "202308",
-      "pubdate_display": "2023年8月発売"
+      "latest_isbn": "9784040659329",
+      "latest_vol": "",
+      "pubdate": "202101",
+      "pubdate_display": "2021年1月発売"
     },
     {
       "title": "ようこそ実力至上主義の教室へ",
-      "latest_isbn": "9784040693033",
-      "latest_vol": "4",
-      "pubdate": "201707",
-      "pubdate_display": "2017年7月発売"
-    },
-    {
-      "title": "時々ボソッとロシア語でデレる隣のアーリャさん",
-      "latest_isbn": "9784041168370",
-      "latest_vol": "11",
+      "latest_isbn": "",
+      "latest_vol": "",
       "pubdate": "",
       "pubdate_display": ""
     },
     {
-      "title": "オーバーロード",
-      "latest_isbn": "9784047353947",
+      "title": "時々ボソッとロシア語でデレる隣のアーリャさん",
+      "latest_isbn": "9784041111185",
       "latest_vol": "",
-      "pubdate": "201812",
-      "pubdate_display": "2018年12月発売"
+      "pubdate": "202103",
+      "pubdate_display": "2021年3月発売"
+    },
+    {
+      "title": "オーバーロード",
+      "latest_isbn": "",
+      "latest_vol": "4",
+      "pubdate": "",
+      "pubdate_display": ""
     },
     {
       "title": "転生したらスライムだった件",
-      "latest_isbn": "9784065335673",
-      "latest_vol": "",
-      "pubdate": "202406",
-      "pubdate_display": "2024年6月発売"
+      "latest_isbn": "9784065439203",
+      "latest_vol": "32",
+      "pubdate": "20260609",
+      "pubdate_display": "2026年6月9日発売予定"
     },
     {
       "title": "無職転生",
@@ -58,130 +65,172 @@
       "pubdate_display": "2022年4月発売"
     },
     {
+      "title": "豚のレバーは加熱しろ",
+      "latest_isbn": "",
+      "latest_vol": "",
+      "pubdate": "20241225",
+      "pubdate_display": "2024年12月25日発売"
+    },
+    {
       "title": "蜘蛛ですが、なにか",
-      "latest_isbn": "9784040748528",
-      "latest_vol": "2",
-      "pubdate": "202302",
-      "pubdate_display": "2023年2月発売"
+      "latest_isbn": "9784040735641",
+      "latest_vol": "",
+      "pubdate": "202012",
+      "pubdate_display": "2020年12月発売"
     },
     {
       "title": "この素晴らしい世界に祝福を",
-      "latest_isbn": "9784041082522",
-      "latest_vol": "7",
-      "pubdate": "202005",
-      "pubdate_display": "2020年5月発売"
+      "latest_isbn": "9784041058169",
+      "latest_vol": "",
+      "pubdate": "201708",
+      "pubdate_display": "2017年8月発売"
     },
     {
       "title": "魔王学院の不適合者",
-      "latest_isbn": "9784049142860",
+      "latest_isbn": "9784049131178",
       "latest_vol": "",
-      "pubdate": "202203",
-      "pubdate_display": "2022年3月発売"
+      "pubdate": "202003",
+      "pubdate_display": "2020年3月発売"
     },
     {
       "title": "ダンジョンに出会いを求めるのは間違っているだろうか",
-      "latest_isbn": "9784815621445",
+      "latest_isbn": "9784815610173",
       "latest_vol": "",
-      "pubdate": "20230831",
-      "pubdate_display": "2023年8月31日発売"
+      "pubdate": "202210",
+      "pubdate_display": "2022年10月発売"
     },
     {
       "title": "86―エイティシックス―",
-      "latest_isbn": "9784049161847",
-      "latest_vol": "14",
-      "pubdate": "202509",
-      "pubdate_display": "2025年9月発売"
+      "latest_isbn": "9784046800060",
+      "latest_vol": "",
+      "pubdate": "202101",
+      "pubdate_display": "2021年1月発売"
     },
     {
       "title": "青春ブタ野郎はバニーガール先輩の夢を見ない",
-      "latest_isbn": "9784049147971",
+      "latest_isbn": "9784048664875",
       "latest_vol": "",
-      "pubdate": "202212",
-      "pubdate_display": "2022年12月発売"
+      "pubdate": "201404",
+      "pubdate_display": "2014年4月発売"
     },
     {
       "title": "スパイ教室",
-      "latest_isbn": "9784040747675",
+      "latest_isbn": "",
       "latest_vol": "",
-      "pubdate": "202303",
-      "pubdate_display": "2023年3月発売"
+      "pubdate": "",
+      "pubdate_display": ""
     },
     {
       "title": "陰の実力者になりたくて",
-      "latest_isbn": "9784041136898",
-      "latest_vol": "6",
-      "pubdate": "202310",
-      "pubdate_display": "2023年10月発売"
+      "latest_isbn": "9784047373617",
+      "latest_vol": "",
+      "pubdate": "202301",
+      "pubdate_display": "2023年1月発売"
     },
     {
       "title": "ホヅミ先生と茉莉くんと",
-      "latest_isbn": "9784049139334",
-      "latest_vol": "3",
-      "pubdate": "202110",
-      "pubdate_display": "2021年10月発売"
+      "latest_isbn": "9784049135343",
+      "latest_vol": "",
+      "pubdate": "202102",
+      "pubdate_display": "2021年2月発売"
     },
     {
       "title": "薬屋のひとりごと",
-      "latest_isbn": "9784301001959",
-      "latest_vol": "1",
+      "latest_isbn": "",
+      "latest_vol": "4",
       "pubdate": "",
       "pubdate_display": ""
     },
     {
       "title": "ひとりぼっちの異世界攻略",
-      "latest_isbn": "9784824011039",
-      "latest_vol": "23",
-      "pubdate": "202502",
-      "pubdate_display": "2025年2月発売"
+      "latest_isbn": "9784824015648",
+      "latest_vol": "",
+      "pubdate": "20260420",
+      "pubdate_display": "2026年4月20日発売予定"
     },
     {
       "title": "最弱テイマーはゴミ拾いの旅を始めました",
-      "latest_isbn": "9784867946015",
-      "latest_vol": "14",
-      "pubdate": "202507",
-      "pubdate_display": "2025年7月発売"
+      "latest_isbn": "9784867949627",
+      "latest_vol": "16",
+      "pubdate": "20260410",
+      "pubdate_display": "2026年4月10日発売予定"
+    },
+    {
+      "title": "ユアフォルマ",
+      "latest_isbn": "9784049136869",
+      "latest_vol": "",
+      "pubdate": "202103",
+      "pubdate_display": "2021年3月発売"
     },
     {
       "title": "リコリス・リコイル",
-      "latest_isbn": "9784046855237",
-      "latest_vol": "8",
+      "latest_isbn": "",
+      "latest_vol": "",
       "pubdate": "",
       "pubdate_display": ""
+    },
+    {
+      "title": "魔導具師ダリヤはうつむかない",
+      "latest_isbn": "",
+      "latest_vol": "",
+      "pubdate": "20240220",
+      "pubdate_display": "2024年2月20日発売"
     },
     {
       "title": "服飾師ルチアはあきらめない",
-      "latest_isbn": "9784866579313",
-      "latest_vol": "6",
+      "latest_isbn": "9784046803757",
+      "latest_vol": "",
+      "pubdate": "202104",
+      "pubdate_display": "2021年4月発売"
+    },
+    {
+      "title": "誰が勇者を殺したか",
+      "latest_isbn": "9784041141847",
+      "latest_vol": "",
+      "pubdate": "202310",
+      "pubdate_display": "2023年10月発売"
+    },
+    {
+      "title": "涼宮ハルヒの憂鬱",
+      "latest_isbn": "",
+      "latest_vol": "",
       "pubdate": "",
       "pubdate_display": ""
     },
     {
-      "title": "誰が勇者を殺したか",
-      "latest_isbn": "9784041162576",
-      "latest_vol": "",
-      "pubdate": "202506",
-      "pubdate_display": "2025年6月発売"
+      "title": "狼と香辛料",
+      "latest_isbn": "9784049166019",
+      "latest_vol": "2",
+      "pubdate": "",
+      "pubdate_display": ""
     },
     {
-      "title": "狼と香辛料",
-      "latest_isbn": "9784048706483",
+      "title": "嘆きの亡霊は引退したい",
+      "latest_isbn": "",
       "latest_vol": "",
-      "pubdate": "201107",
-      "pubdate_display": "2011年7月発売"
+      "pubdate": "20251127",
+      "pubdate_display": "2025年11月27日発売"
     },
     {
       "title": "天久鷹央の推理カルテ",
-      "latest_isbn": "9784065403747",
-      "latest_vol": "2",
-      "pubdate": "202508",
-      "pubdate_display": "2025年8月発売"
+      "latest_isbn": "9784408558356",
+      "latest_vol": "",
+      "pubdate": "202310",
+      "pubdate_display": "2023年10月発売"
     },
     {
       "title": "水属性の魔法使い",
-      "latest_isbn": "9784867946923",
-      "latest_vol": "1",
-      "pubdate": "202510",
-      "pubdate_display": "2025年10月発売"
+      "latest_isbn": "9784868540007",
+      "latest_vol": "2",
+      "pubdate": "20260515",
+      "pubdate_display": "2026年5月15日発売予定"
+    },
+    {
+      "title": "神は遊戯に飢えている",
+      "latest_isbn": "",
+      "latest_vol": "",
+      "pubdate": "20250322",
+      "pubdate_display": "2025年3月22日発売"
     },
     {
       "title": "護衛騎士ヨナスはふりむかない",
