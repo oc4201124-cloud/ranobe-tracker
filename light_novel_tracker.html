@@ -236,6 +236,37 @@
     border-bottom: 1px solid var(--border);
   }
   .library-result .lib-row:last-child { border-bottom: none; }
+  .isbn-box {
+    background: #fff;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+  }
+  .isbn-label {
+    font-size: 11px; color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .isbn-row {
+    display: flex; align-items: center; gap: 8px;
+    flex-wrap: wrap;
+  }
+  .isbn-code {
+    font-family: "Consolas", "Menlo", monospace;
+    font-size: 15px; font-weight: 700;
+    color: var(--accent-dark);
+    background: #eff6ff;
+    padding: 4px 10px;
+    border-radius: 4px;
+    user-select: all;
+  }
+  .lib-summary {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px dashed var(--border);
+  }
   .status-ok { color: var(--success); font-weight: 600; }
   .status-no { color: var(--danger); }
   .status-wait { color: var(--warn); }
@@ -383,6 +414,23 @@
       <button class="btn primary" id="save-settings">保存</button>
     </div>
 
+    <label style="margin-top:16px;"><input type="checkbox" id="only-available"> 在庫ありの図書館のみ表示</label>
+
+    <hr style="margin:24px 0; border:none; border-top:1px solid var(--border);">
+    <h2>クラウド同期(GitHub Gist)</h2>
+    <label for="github-token">GitHub Personal Access Token</label>
+    <input type="password" id="github-token" placeholder="ghp_...">
+    <p class="hint">
+      <a href="https://github.com/settings/tokens/new?description=ranobe-tracker-sync&scopes=gist" target="_blank" rel="noopener">トークンを新規作成</a>
+      — Scopesは <b>gist</b> のみ、Expirationは <b>No expiration</b> 推奨
+    </p>
+    <div class="row-inline" style="margin-top:12px;">
+      <button class="btn primary" id="save-sync">保存して同期</button>
+      <button class="btn" id="sync-now">今すぐ同期</button>
+      <button class="btn" id="sync-pull">リモートから取得</button>
+    </div>
+    <div class="hint" id="sync-status" style="margin-top:8px;">未設定</div>
+
     <hr style="margin:24px 0; border:none; border-top:1px solid var(--border);">
     <h2>データ管理</h2>
     <div class="row-inline">
@@ -484,8 +532,12 @@ function loadLibrary() {
     return JSON.parse(s);
   } catch { return JSON.parse(JSON.stringify(INITIAL_DATA)); }
 }
-function saveLibrary(list) {
+function saveLibrary(list, opts) {
   localStorage.setItem(LS_KEY, JSON.stringify(list));
+  if (!opts || !opts.silent) {
+    setLocalUpdatedAt(new Date().toISOString());
+    scheduleSyncPush();
+  }
 }
 function loadSettings() {
   try { return JSON.parse(localStorage.getItem(LS_SETTINGS) || '{}'); }
@@ -495,8 +547,14 @@ function saveSettings(obj) {
   localStorage.setItem(LS_SETTINGS, JSON.stringify(obj));
 }
 
+const LS_UPDATED = 'ln_updated_at';
+function getLocalUpdatedAt() { return localStorage.getItem(LS_UPDATED) || ''; }
+function setLocalUpdatedAt(t) { localStorage.setItem(LS_UPDATED, t); }
+
 let library = loadLibrary();
 let settings = loadSettings();
+let syncTimer = null;
+let syncing = false;
 
 /* ================= ユーティリティ ================= */
 function $(sel) { return document.querySelector(sel); }
@@ -686,60 +744,129 @@ async function openbdSearchIsbn(title) {
   return null;
 }
 
+/* 次巻ISBNを優先検索。失敗したらタイトル単体でフォールバック */
+async function findNextVolumeIsbn(book) {
+  const title = book.title;
+  const vol = book.nextVol;
+  const queries = [];
+  if (vol) {
+    queries.push(`${title} ${vol}`);
+    queries.push(`${title} ${vol}巻`);
+  }
+  queries.push(title);
+  for (const q of queries) {
+    const isbn = await openbdSearchIsbn(q);
+    if (isbn) return isbn;
+  }
+  return null;
+}
+
 async function checkLibrary(book) {
   const box = document.getElementById('lib-' + book.id);
   if (!box) return;
   const appkey = settings.calilKey || '';
   const systemid = settings.calilSystemid || '';
-  if (!appkey || !systemid) {
-    if (confirm('カーリルAPIキー（または図書館）が未設定です。\n設定タブを開きますか？')) {
-      activateTab('settings');
-    }
-    return;
-  }
   box.style.display = 'block';
   box.innerHTML = '<div class="loading">ISBN を取得中…</div>';
   try {
-    const isbn = await openbdSearchIsbn(book.title);
+    const isbn = await findNextVolumeIsbn(book);
     if (!isbn) {
       box.innerHTML = '<div class="status-no">ISBN が見つかりませんでした。</div>';
       return;
     }
-    box.innerHTML = `<div class="loading">図書館を照会中…（ISBN: ${esc(isbn)}）</div>`;
+    // ISBN表示は常に行う（カーリル未設定でも見られる）
+    const isbnHeader = `
+      <div class="isbn-box">
+        <div class="isbn-label">次巻のISBN（図書館リクエスト用）</div>
+        <div class="isbn-row">
+          <code class="isbn-code">${esc(isbn)}</code>
+          <button class="btn small" data-copy="${esc(isbn)}">コピー</button>
+        </div>
+      </div>
+    `;
+    if (!appkey || !systemid) {
+      box.innerHTML = isbnHeader + '<div class="hint" style="margin-top:6px;">カーリルAPIキー / 図書館が未設定のため所蔵検索はスキップしました。設定タブで設定すると所蔵情報も表示されます。</div>';
+      bindCopyButtons(box);
+      return;
+    }
+    box.innerHTML = isbnHeader + '<div class="loading">図書館を照会中…</div>';
+    bindCopyButtons(box);
     const data = await calilCheckByIsbn(isbn, systemid, appkey);
-    renderLibraryResult(box, data, systemid, isbn);
+    renderLibraryResult(box, data, systemid, isbn, isbnHeader);
   } catch (e) {
     box.innerHTML = `<div class="status-no">エラー: ${esc(e.message)}</div>`;
   }
 }
 
-function renderLibraryResult(box, data, systemid, isbn) {
+function bindCopyButtons(container) {
+  container.querySelectorAll('[data-copy]').forEach(el => {
+    el.addEventListener('click', async (e) => {
+      const v = e.currentTarget.dataset.copy;
+      try {
+        await navigator.clipboard.writeText(v);
+        toast('コピーしました: ' + v);
+      } catch {
+        // フォールバック
+        const ta = document.createElement('textarea');
+        ta.value = v; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); toast('コピーしました'); } catch {}
+        document.body.removeChild(ta);
+      }
+    });
+  });
+}
+
+function renderLibraryResult(box, data, systemid, isbn, headerHtml) {
+  const header = headerHtml || '';
   if (!data || !data.books || !data.books[isbn]) {
-    box.innerHTML = '<div class="status-no">結果なし</div>';
+    box.innerHTML = header + '<div class="status-no">結果なし</div>';
+    bindCopyButtons(box);
     return;
   }
   const sys = data.books[isbn][systemid];
-  if (!sys) { box.innerHTML = '<div class="status-no">この図書館では該当なし</div>'; return; }
+  if (!sys) {
+    box.innerHTML = header + '<div class="status-no">この図書館では該当なし</div>';
+    bindCopyButtons(box);
+    return;
+  }
   const libkey = sys.libkey || {};
-  const keys = Object.keys(libkey);
-  let html = '';
-  if (keys.length === 0) {
-    const status = sys.status || '不明';
-    html = `<div class="status-no">所蔵なし（${esc(status)}）</div>`;
+  let rows = Object.keys(libkey).map(k => {
+    const s = libkey[k] || '';
+    let cls = 'status-wait';
+    let available = false;
+    if (/貸出可|蔵書あり/.test(s)) { cls = 'status-ok'; available = true; }
+    else if (/貸出中|予約中/.test(s)) cls = 'status-wait';
+    else if (/なし/.test(s)) cls = 'status-no';
+    return { k, s, cls, available };
+  });
+
+  // 在庫ありを上位にソート
+  rows.sort((a, b) => (b.available ? 1 : 0) - (a.available ? 1 : 0));
+
+  const onlyAvail = !!settings.onlyAvailable;
+  const displayRows = onlyAvail ? rows.filter(r => r.available) : rows;
+  const okCount = rows.filter(r => r.available).length;
+
+  let html = header;
+  html += `<div class="lib-summary">所蔵 ${rows.length} 館 / 在庫あり <span class="status-ok">${okCount}</span> 館</div>`;
+
+  if (displayRows.length === 0) {
+    if (rows.length === 0) {
+      const status = sys.status || '不明';
+      html += `<div class="status-no">所蔵なし（${esc(status)}）</div>`;
+    } else {
+      html += '<div class="status-wait">在庫ありの図書館は現在ありません。</div>';
+    }
   } else {
-    html = keys.map(k => {
-      const s = libkey[k] || '';
-      let cls = 'status-wait';
-      if (/貸出可|蔵書あり/.test(s)) cls = 'status-ok';
-      else if (/貸出中|予約中/.test(s)) cls = 'status-wait';
-      else if (/なし/.test(s)) cls = 'status-no';
-      return `<div class="lib-row"><span class="${cls}">${esc(s)}</span> — ${esc(k)}</div>`;
-    }).join('');
+    html += displayRows.map(r =>
+      `<div class="lib-row"><span class="${r.cls}">${esc(r.s)}</span> — ${esc(r.k)}</div>`
+    ).join('');
   }
   if (sys.reserveurl) {
     html += `<div style="margin-top:6px;"><a class="btn small" target="_blank" rel="noopener" href="${esc(sys.reserveurl)}">予約ページを開く</a></div>`;
   }
   box.innerHTML = html;
+  bindCopyButtons(box);
 }
 
 /* ================= 絞り込み・ソート ================= */
@@ -998,9 +1125,171 @@ $('#clear-btn').addEventListener('click', () => {
   }
 });
 
+/* ================= Gist 同期 ================= */
+async function gistApi(method, path, token, body) {
+  const res = await fetch('https://api.github.com' + path, {
+    method,
+    headers: {
+      'Authorization': 'token ' + token,
+      'Accept': 'application/vnd.github+json',
+      'Content-Type': 'application/json'
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error('GitHub API ' + res.status + ': ' + txt.slice(0, 200));
+  }
+  return res.json();
+}
+
+async function gistFindOrCreate(token) {
+  if (settings.gistId) {
+    try {
+      await gistApi('GET', '/gists/' + settings.gistId, token);
+      return settings.gistId;
+    } catch (e) { console.warn('既存Gist取得失敗', e); }
+  }
+  const gists = await gistApi('GET', '/gists?per_page=100', token);
+  for (const g of gists) {
+    if (g.files && g.files['ranobe-tracker.json']) {
+      settings.gistId = g.id;
+      saveSettings(settings);
+      return g.id;
+    }
+  }
+  const now = new Date().toISOString();
+  const created = await gistApi('POST', '/gists', token, {
+    description: 'ranobe-tracker data',
+    public: false,
+    files: {
+      'ranobe-tracker.json': {
+        content: JSON.stringify({ library, updatedAt: now }, null, 2)
+      }
+    }
+  });
+  settings.gistId = created.id;
+  saveSettings(settings);
+  return created.id;
+}
+
+async function gistPull(token, gistId) {
+  const g = await gistApi('GET', '/gists/' + gistId, token);
+  const file = g.files && g.files['ranobe-tracker.json'];
+  if (!file) throw new Error('Gist に ranobe-tracker.json がありません');
+  let content = file.content;
+  if (file.truncated && file.raw_url) {
+    const r = await fetch(file.raw_url);
+    content = await r.text();
+  }
+  return JSON.parse(content);
+}
+
+async function gistPush(token, gistId, data) {
+  await gistApi('PATCH', '/gists/' + gistId, token, {
+    files: {
+      'ranobe-tracker.json': {
+        content: JSON.stringify(data, null, 2)
+      }
+    }
+  });
+}
+
+function setSyncStatus(msg) {
+  const el = document.getElementById('sync-status');
+  if (el) el.textContent = msg;
+}
+
+async function syncInit() {
+  const token = settings.githubToken;
+  if (!token) { setSyncStatus('未設定'); return; }
+  try {
+    setSyncStatus('同期中…');
+    const gistId = await gistFindOrCreate(token);
+    const remote = await gistPull(token, gistId);
+    const localAt = getLocalUpdatedAt();
+    const remoteAt = remote.updatedAt || '';
+    if (remoteAt && (!localAt || remoteAt > localAt)) {
+      library = Array.isArray(remote.library) ? remote.library : [];
+      localStorage.setItem(LS_KEY, JSON.stringify(library));
+      setLocalUpdatedAt(remoteAt);
+      render();
+      setSyncStatus('取得完了: ' + new Date().toLocaleTimeString());
+    } else if (localAt && localAt > remoteAt) {
+      await gistPush(token, gistId, { library, updatedAt: localAt });
+      setSyncStatus('送信完了: ' + new Date().toLocaleTimeString());
+    } else {
+      setSyncStatus('同期済み: ' + new Date().toLocaleTimeString());
+    }
+  } catch (e) {
+    setSyncStatus('エラー: ' + e.message);
+  }
+}
+
+async function syncPushNow() {
+  const token = settings.githubToken;
+  if (!token) { setSyncStatus('トークンが未設定'); return; }
+  if (syncing) return;
+  syncing = true;
+  try {
+    setSyncStatus('送信中…');
+    const gistId = settings.gistId || await gistFindOrCreate(token);
+    const at = getLocalUpdatedAt() || new Date().toISOString();
+    await gistPush(token, gistId, { library, updatedAt: at });
+    setSyncStatus('送信完了: ' + new Date().toLocaleTimeString());
+  } catch (e) {
+    setSyncStatus('エラー: ' + e.message);
+  } finally {
+    syncing = false;
+  }
+}
+
+async function syncPullNow() {
+  const token = settings.githubToken;
+  if (!token) { setSyncStatus('トークンが未設定'); return; }
+  try {
+    setSyncStatus('取得中…');
+    const gistId = await gistFindOrCreate(token);
+    const remote = await gistPull(token, gistId);
+    if (!confirm('リモートのデータで現在の本棚を上書きしますか?')) {
+      setSyncStatus('キャンセルしました');
+      return;
+    }
+    library = Array.isArray(remote.library) ? remote.library : [];
+    localStorage.setItem(LS_KEY, JSON.stringify(library));
+    setLocalUpdatedAt(remote.updatedAt || new Date().toISOString());
+    render();
+    setSyncStatus('取得完了: ' + new Date().toLocaleTimeString());
+  } catch (e) {
+    setSyncStatus('エラー: ' + e.message);
+  }
+}
+
+function scheduleSyncPush() {
+  if (!settings.githubToken) return;
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncPushNow, 1500);
+}
+
 /* ================= 初期化 ================= */
+$('#github-token').value = settings.githubToken || '';
+$('#only-available').checked = !!settings.onlyAvailable;
+$('#only-available').addEventListener('change', () => {
+  settings.onlyAvailable = $('#only-available').checked;
+  saveSettings(settings);
+});
+$('#save-sync').addEventListener('click', async () => {
+  settings.githubToken = $('#github-token').value.trim();
+  saveSettings(settings);
+  await syncInit();
+});
+$('#sync-now').addEventListener('click', syncPushNow);
+$('#sync-pull').addEventListener('click', syncPullNow);
+
 applySettingsToForm();
 render();
+// ページロード時に自動同期
+setTimeout(syncInit, 300);
 </script>
 </body>
 </html>
