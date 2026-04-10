@@ -267,6 +267,21 @@
     padding-bottom: 4px;
     border-bottom: 1px dashed var(--border);
   }
+  .calil-attribution {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+  }
+  .calil-attribution a {
+    color: var(--muted);
+    text-decoration: underline;
+  }
+  .auto-badge {
+    display: inline-block;
+    font-size: 10px;
+    margin-right: 2px;
+  }
   .status-ok { color: var(--success); font-weight: 600; }
   .status-no { color: var(--danger); }
   .status-wait { color: var(--warn); }
@@ -390,31 +405,14 @@
 
     <label for="calil-key">カーリル APIキー</label>
     <input type="text" id="calil-key" placeholder="カーリルのアプリキー">
-    <p class="hint">https://calil.jp/api/dashboard/ で無料取得できます。localStorageに保存されます。</p>
-
-    <label for="calil-systemid">図書館（systemid）</label>
-    <select id="calil-systemid">
-      <option value="Tokyo_Pref">東京都立図書館 (Tokyo_Pref)</option>
-      <option value="Osaka_Pref">大阪府立図書館 (Osaka_Pref)</option>
-      <option value="Aichi_Pref">愛知県図書館 (Aichi_Pref)</option>
-      <option value="Kanagawa_Pref">神奈川県立図書館 (Kanagawa_Pref)</option>
-      <option value="Hokkaido_Pref">北海道立図書館 (Hokkaido_Pref)</option>
-      <option value="Fukuoka_Pref">福岡県立図書館 (Fukuoka_Pref)</option>
-      <option value="Kyoto_Pref">京都府立図書館 (Kyoto_Pref)</option>
-      <option value="Hyogo_Pref">兵庫県立図書館 (Hyogo_Pref)</option>
-      <option value="Saitama_Pref">埼玉県立図書館 (Saitama_Pref)</option>
-      <option value="Chiba_Pref">千葉県立図書館 (Chiba_Pref)</option>
-      <option value="Miyagi_Pref">宮城県図書館 (Miyagi_Pref)</option>
-      <option value="Hiroshima_Pref">広島県立図書館 (Hiroshima_Pref)</option>
-      <option value="__custom__">カスタム入力…</option>
-    </select>
-    <input type="text" id="calil-systemid-custom" placeholder="例：Tokyo_Setagaya" style="display:none; margin-top:8px;">
+    <p class="hint">
+      <a href="https://calil.jp/api/dashboard/" target="_blank" rel="noopener">https://calil.jp/api/dashboard/</a> で無料取得できます。localStorageに保存されます。<br>
+      検索対象: <b>君津市立中央図書館 / 富津市立図書館</b>
+    </p>
 
     <div style="margin-top:16px;">
       <button class="btn primary" id="save-settings">保存</button>
     </div>
-
-    <label style="margin-top:16px;"><input type="checkbox" id="only-available"> 在庫ありの図書館のみ表示</label>
 
     <hr style="margin:24px 0; border:none; border-top:1px solid var(--border);">
     <h2>クラウド同期(GitHub Gist)</h2>
@@ -555,6 +553,29 @@ let library = loadLibrary();
 let settings = loadSettings();
 let syncTimer = null;
 let syncing = false;
+let releaseInfo = {}; // title -> {latest_isbn, latest_vol, pubdate, pubdate_display}
+
+const RELEASE_INFO_URL = 'https://raw.githubusercontent.com/oc4201124-cloud/ranobe-tracker/main/release_info.json';
+
+async function loadReleaseInfo() {
+  try {
+    const res = await fetch(RELEASE_INFO_URL + '?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && Array.isArray(data.books)) {
+      const map = {};
+      for (const b of data.books) {
+        if (b && b.title) map[b.title] = b;
+      }
+      releaseInfo = map;
+      render();
+      const upcoming = document.getElementById('upcoming');
+      if (upcoming && upcoming.classList.contains('active')) renderUpcoming();
+    }
+  } catch (e) {
+    console.warn('release_info.json fetch failed', e);
+  }
+}
 
 /* ================= ユーティリティ ================= */
 function $(sel) { return document.querySelector(sel); }
@@ -575,7 +596,13 @@ function toast(msg) {
   clearTimeout(toast._tid);
   toast._tid = setTimeout(() => t.classList.remove('show'), 2000);
 }
-function amazonUrl(title, vol) {
+function amazonUrl(book) {
+  if (book && book.isbn) {
+    return 'https://www.amazon.co.jp/s?k=' + encodeURIComponent(book.isbn);
+  }
+  const title = book ? book.title : '';
+  const done = book ? isDone(book) : false;
+  const vol = done ? null : (book ? book.nextVol : null);
   const q = vol ? `${title} ${vol}巻` : title;
   return 'https://www.amazon.co.jp/s?k=' + encodeURIComponent(q);
 }
@@ -651,7 +678,7 @@ function render() {
     const volLabel = done
       ? '<span class="vol" style="background:#e5e7eb;color:#6b7280;">完結</span>'
       : `<span class="vol">次巻 ${esc(b.nextVol)}</span>`;
-    const amazon = amazonUrl(b.title, done ? null : b.nextVol);
+    const amazon = amazonUrl(b);
     return `
       <div class="book-card ${done ? 'done' : ''}" data-id="${esc(b.id)}">
         <div class="book-title">${icons.join('')} ${esc(b.title)}</div>
@@ -724,78 +751,99 @@ async function calilCheckByIsbn(isbn, systemid, appkey) {
   return data;
 }
 
-async function openbdSearchIsbn(title) {
-  try {
-    const url = `https://api.openbd.jp/v1/search?title=${encodeURIComponent(title)}&limit=5`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (Array.isArray(data)) {
-      for (const item of data) {
-        if (!item) continue;
-        if (typeof item === 'string') return item;
-        if (item.isbn) return item.isbn;
-        if (item.summary && item.summary.isbn) return item.summary.isbn;
-      }
-    } else if (data && Array.isArray(data.hits)) {
-      for (const h of data.hits) if (h && h.isbn) return h.isbn;
-    }
-  } catch {}
-  return null;
-}
 
-/* 次巻ISBNを優先検索。失敗したらタイトル単体でフォールバック */
-async function findNextVolumeIsbn(book) {
-  const title = book.title;
-  const vol = book.nextVol;
-  const queries = [];
-  if (vol) {
-    queries.push(`${title} ${vol}`);
-    queries.push(`${title} ${vol}巻`);
-  }
-  queries.push(title);
-  for (const q of queries) {
-    const isbn = await openbdSearchIsbn(q);
-    if (isbn) return isbn;
-  }
-  return null;
-}
+const CHIBA_LIBS = {
+  'Chiba_Kimitsu': '君津市立中央図書館',
+  'Chiba_Futtsu':  '富津市立図書館'
+};
+const CHIBA_SYSTEMID = 'Chiba_Kimitsu,Chiba_Futtsu';
 
 async function checkLibrary(book) {
   const box = document.getElementById('lib-' + book.id);
   if (!box) return;
-  const appkey = settings.calilKey || '';
-  const systemid = settings.calilSystemid || '';
   box.style.display = 'block';
-  box.innerHTML = '<div class="loading">ISBN を取得中…</div>';
-  try {
-    const isbn = await findNextVolumeIsbn(book);
-    if (!isbn) {
-      box.innerHTML = '<div class="status-no">ISBN が見つかりませんでした。</div>';
-      return;
-    }
-    // ISBN表示は常に行う（カーリル未設定でも見られる）
-    const isbnHeader = `
-      <div class="isbn-box">
-        <div class="isbn-label">次巻のISBN（図書館リクエスト用）</div>
-        <div class="isbn-row">
-          <code class="isbn-code">${esc(isbn)}</code>
-          <button class="btn small" data-copy="${esc(isbn)}">コピー</button>
-        </div>
-      </div>
-    `;
-    if (!appkey || !systemid) {
-      box.innerHTML = isbnHeader + '<div class="hint" style="margin-top:6px;">カーリルAPIキー / 図書館が未設定のため所蔵検索はスキップしました。設定タブで設定すると所蔵情報も表示されます。</div>';
-      bindCopyButtons(box);
-      return;
-    }
-    box.innerHTML = isbnHeader + '<div class="loading">図書館を照会中…</div>';
-    bindCopyButtons(box);
-    const data = await calilCheckByIsbn(isbn, systemid, appkey);
-    renderLibraryResult(box, data, systemid, isbn, isbnHeader);
-  } catch (e) {
-    box.innerHTML = `<div class="status-no">エラー: ${esc(e.message)}</div>`;
+
+  if (!book.isbn) {
+    box.innerHTML = '<div class="status-no">ISBNが登録されていません。本を追加タブから再登録してください。</div>';
+    return;
   }
+
+  const isbnHeader = `
+    <div class="isbn-box">
+      <div class="isbn-label">ISBN</div>
+      <div class="isbn-row">
+        <code class="isbn-code">ISBN: ${esc(book.isbn)}</code>
+        <button class="btn small" data-copy="${esc(book.isbn)}">コピー</button>
+      </div>
+    </div>
+  `;
+
+  const appkey = settings.calilKey || '';
+  if (!appkey) {
+    box.innerHTML = isbnHeader + '<div class="status-no" style="margin-top:6px;">設定タブでカーリルAPIキーを登録してください</div>'
+      + '<div class="calil-attribution"><a href="https://calil.jp" target="_blank" rel="noopener">Powered by カーリル</a></div>';
+    bindCopyButtons(box);
+    return;
+  }
+
+  box.innerHTML = isbnHeader + '<div class="loading">君津市・富津市の図書館を照会中…</div>';
+  bindCopyButtons(box);
+
+  try {
+    const data = await calilCheckByIsbn(book.isbn, CHIBA_SYSTEMID, appkey);
+    renderChibaResult(box, data, book.isbn, isbnHeader);
+  } catch (e) {
+    box.innerHTML = isbnHeader + `<div class="status-no">エラー: ${esc(e.message)}</div>`
+      + '<div class="calil-attribution"><a href="https://calil.jp" target="_blank" rel="noopener">Powered by カーリル</a></div>';
+    bindCopyButtons(box);
+  }
+}
+
+function renderChibaResult(box, data, isbn, headerHtml) {
+  const header = headerHtml || '';
+  const attribution = '<div class="calil-attribution" style="margin-top:8px;"><a href="https://calil.jp" target="_blank" rel="noopener">Powered by カーリル</a></div>';
+
+  if (!data || !data.books || !data.books[isbn]) {
+    box.innerHTML = header + '<div class="status-no">結果なし</div>' + attribution;
+    bindCopyButtons(box);
+    return;
+  }
+  const booksData = data.books[isbn];
+  let html = header;
+
+  for (const sid of Object.keys(CHIBA_LIBS)) {
+    const name = CHIBA_LIBS[sid];
+    const sys = booksData[sid];
+    if (!sys) {
+      html += `<div class="lib-row">📚 ${esc(name)}: <span class="status-no">情報なし</span></div>`;
+      continue;
+    }
+    const libkey = sys.libkey || {};
+    const keys = Object.keys(libkey);
+    let statusText = '';
+    let cls = 'status-no';
+    if (keys.length === 0) {
+      statusText = '蔵書なし';
+    } else {
+      let hasAvail = false, hasUnavail = false;
+      for (const k of keys) {
+        const s = libkey[k] || '';
+        if (/貸出可|蔵書あり/.test(s)) hasAvail = true;
+        else if (/貸出中|予約中|館内のみ/.test(s)) hasUnavail = true;
+      }
+      if (hasAvail)      { statusText = '貸出可'; cls = 'status-ok'; }
+      else if (hasUnavail){ statusText = '貸出中'; cls = 'status-wait'; }
+      else                { statusText = '蔵書なし'; cls = 'status-no'; }
+    }
+    html += `<div class="lib-row">📚 ${esc(name)}: <span class="${cls}">${esc(statusText)}</span>`;
+    if (sys.reserveurl) {
+      html += ` <a href="${esc(sys.reserveurl)}" target="_blank" rel="noopener" style="font-size:11px;">[予約]</a>`;
+    }
+    html += `</div>`;
+  }
+  html += attribution;
+  box.innerHTML = html;
+  bindCopyButtons(box);
 }
 
 function bindCopyButtons(container) {
@@ -816,58 +864,6 @@ function bindCopyButtons(container) {
   });
 }
 
-function renderLibraryResult(box, data, systemid, isbn, headerHtml) {
-  const header = headerHtml || '';
-  if (!data || !data.books || !data.books[isbn]) {
-    box.innerHTML = header + '<div class="status-no">結果なし</div>';
-    bindCopyButtons(box);
-    return;
-  }
-  const sys = data.books[isbn][systemid];
-  if (!sys) {
-    box.innerHTML = header + '<div class="status-no">この図書館では該当なし</div>';
-    bindCopyButtons(box);
-    return;
-  }
-  const libkey = sys.libkey || {};
-  let rows = Object.keys(libkey).map(k => {
-    const s = libkey[k] || '';
-    let cls = 'status-wait';
-    let available = false;
-    if (/貸出可|蔵書あり/.test(s)) { cls = 'status-ok'; available = true; }
-    else if (/貸出中|予約中/.test(s)) cls = 'status-wait';
-    else if (/なし/.test(s)) cls = 'status-no';
-    return { k, s, cls, available };
-  });
-
-  // 在庫ありを上位にソート
-  rows.sort((a, b) => (b.available ? 1 : 0) - (a.available ? 1 : 0));
-
-  const onlyAvail = !!settings.onlyAvailable;
-  const displayRows = onlyAvail ? rows.filter(r => r.available) : rows;
-  const okCount = rows.filter(r => r.available).length;
-
-  let html = header;
-  html += `<div class="lib-summary">所蔵 ${rows.length} 館 / 在庫あり <span class="status-ok">${okCount}</span> 館</div>`;
-
-  if (displayRows.length === 0) {
-    if (rows.length === 0) {
-      const status = sys.status || '不明';
-      html += `<div class="status-no">所蔵なし（${esc(status)}）</div>`;
-    } else {
-      html += '<div class="status-wait">在庫ありの図書館は現在ありません。</div>';
-    }
-  } else {
-    html += displayRows.map(r =>
-      `<div class="lib-row"><span class="${r.cls}">${esc(r.s)}</span> — ${esc(r.k)}</div>`
-    ).join('');
-  }
-  if (sys.reserveurl) {
-    html += `<div style="margin-top:6px;"><a class="btn small" target="_blank" rel="noopener" href="${esc(sys.reserveurl)}">予約ページを開く</a></div>`;
-  }
-  box.innerHTML = html;
-  bindCopyButtons(box);
-}
 
 /* ================= 絞り込み・ソート ================= */
 $('#filter-input').addEventListener('input', render);
@@ -978,6 +974,7 @@ $('#modal-ok').addEventListener('click', () => {
   library.push({
     id: nextId(),
     title: pendingBook.title,
+    isbn: pendingBook.isbn || null,
     nextVol: nextVol === '' ? null : nextVol,
     releaseNote: note,
   });
@@ -1021,22 +1018,35 @@ $('#edit-ok').addEventListener('click', () => {
 /* ================= 発売予定 ================= */
 function renderUpcoming() {
   const list = $('#upcoming-list');
-  const items = library.filter(b => b.releaseNote && !/完結/.test(b.releaseNote));
+  const items = library.filter(b => {
+    if (b.releaseNote && !/完結/.test(b.releaseNote)) return true;
+    const ri = releaseInfo[b.title];
+    if (ri && ri.pubdate_display) return true;
+    return false;
+  });
   if (items.length === 0) {
     list.innerHTML = '<div class="empty">発売情報が登録されている作品はありません。</div>';
     return;
   }
   list.innerHTML = items.map(b => {
     const tbd = isTbd(b);
+    const ri = releaseInfo[b.title];
     const icon = tbd
       ? '<span class="status-icon icon-tbd" title="未確定">?</span>'
       : '<span class="status-icon icon-release" title="発売情報">!</span>';
-    const amazon = amazonUrl(b.title, b.nextVol);
+    const amazonBook = (ri && ri.latest_isbn) ? { ...b, isbn: ri.latest_isbn } : b;
+    const amazon = amazonUrl(amazonBook);
+    const displayText = (ri && ri.pubdate_display) || b.releaseNote || '';
+    const volDisplay = (ri && ri.latest_vol) ? ri.latest_vol : (b.nextVol || '?');
+    const autoBadge = (ri && ri.pubdate_display)
+      ? '<span class="auto-badge" title="自動取得">🔄</span>'
+      : '';
     return `
       <div class="book-card">
         <div class="book-title">${icon} ${esc(b.title)}</div>
-        <div class="book-meta"><span class="vol">次巻 ${esc(b.nextVol || '?')}</span></div>
-        <div class="book-note">📅 ${esc(b.releaseNote)}</div>
+        <div class="book-meta"><span class="vol">${autoBadge} 次巻 ${esc(volDisplay)}</span></div>
+        ${displayText ? `<div class="book-note">📅 ${esc(displayText)}</div>` : ''}
+        ${(ri && ri.latest_isbn) ? `<div class="book-meta" style="font-size:11px;">ISBN: ${esc(ri.latest_isbn)}</div>` : ''}
         <div class="card-actions">
           <a class="btn small primary" target="_blank" rel="noopener" href="${esc(amazon)}">Amazonで確認</a>
           <button class="btn small" data-act="edit" data-id="${esc(b.id)}">編集</button>
@@ -1054,29 +1064,9 @@ function renderUpcoming() {
 /* ================= 設定 ================= */
 function applySettingsToForm() {
   $('#calil-key').value = settings.calilKey || '';
-  const sel = $('#calil-systemid');
-  const custom = $('#calil-systemid-custom');
-  const sid = settings.calilSystemid || 'Tokyo_Pref';
-  const options = Array.from(sel.options).map(o => o.value);
-  if (options.includes(sid)) {
-    sel.value = sid;
-    custom.style.display = 'none';
-  } else {
-    sel.value = '__custom__';
-    custom.style.display = 'block';
-    custom.value = sid;
-  }
 }
-$('#calil-systemid').addEventListener('change', () => {
-  $('#calil-systemid-custom').style.display =
-    $('#calil-systemid').value === '__custom__' ? 'block' : 'none';
-});
 $('#save-settings').addEventListener('click', () => {
   settings.calilKey = $('#calil-key').value.trim();
-  const sel = $('#calil-systemid').value;
-  settings.calilSystemid = sel === '__custom__'
-    ? $('#calil-systemid-custom').value.trim()
-    : sel;
   saveSettings(settings);
   toast('保存しました');
 });
@@ -1273,11 +1263,6 @@ function scheduleSyncPush() {
 
 /* ================= 初期化 ================= */
 $('#github-token').value = settings.githubToken || '';
-$('#only-available').checked = !!settings.onlyAvailable;
-$('#only-available').addEventListener('change', () => {
-  settings.onlyAvailable = $('#only-available').checked;
-  saveSettings(settings);
-});
 $('#save-sync').addEventListener('click', async () => {
   settings.githubToken = $('#github-token').value.trim();
   saveSettings(settings);
@@ -1288,6 +1273,8 @@ $('#sync-pull').addEventListener('click', syncPullNow);
 
 applySettingsToForm();
 render();
+// ページロード時に release_info.json を取得
+loadReleaseInfo();
 // ページロード時に自動同期
 setTimeout(syncInit, 300);
 </script>
