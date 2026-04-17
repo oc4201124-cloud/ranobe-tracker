@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-04-17T07:09:26.245Z",
+  "updated_at": "2026-04-17T22:15:15.950Z",
   "books": [
     {
       "title": "神達に拾われた男",
@@ -213,10 +213,10 @@
     },
     {
       "title": "天久鷹央の推理カルテ",
-      "latest_isbn": "9784408558356",
+      "latest_isbn": "9784408560076",
       "latest_vol": "",
-      "pubdate": "202310",
-      "pubdate_display": "2023年10月発売"
+      "pubdate": "",
+      "pubdate_display": ""
     },
     {
       "title": "水属性の魔法使い",
